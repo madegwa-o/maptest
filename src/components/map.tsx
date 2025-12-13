@@ -15,10 +15,10 @@ export function Map() {
     const [mapLoaded, setMapLoaded] = useState(false)
     const [tokenLoaded, setTokenLoaded] = useState(false)
 
-    // Load Mapbox token
     useEffect(() => {
         getMapboxToken().then((token) => {
             mapboxgl.accessToken = token
+            ;(mapboxgl as any).workerClass = null
             setTokenLoaded(true)
         })
     }, [])
@@ -38,7 +38,7 @@ export function Map() {
         map.current.on("load", () => {
             setMapLoaded(true)
 
-            // Add empty route source
+            // Add route line source and layer
             map.current?.addSource("route", {
                 type: "geojson",
                 data: {
@@ -51,7 +51,6 @@ export function Map() {
                 },
             })
 
-            // Add line layer
             map.current?.addLayer({
                 id: "route",
                 type: "line",
@@ -66,30 +65,37 @@ export function Map() {
                     "line-opacity": 0.9,
                 },
             })
+
+            console.log("[v0] Map loaded and route layer added")
         })
 
-        // Cleanup
         return () => {
             marker.current?.remove()
             map.current?.remove()
         }
     }, [tokenLoaded])
 
-    // Update marker position
+    // Update user marker and center map on current position
     useEffect(() => {
         if (!map.current || !mapLoaded || !currentPosition) return
 
         const [lng, lat] = currentPosition
 
+        console.log("[v0] Updating marker position:", { lng, lat })
+
+        // Create or update marker
         if (!marker.current) {
             const el = document.createElement("div")
             el.className = "w-4 h-4 bg-track-active rounded-full border-4 border-white shadow-lg"
 
             marker.current = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map.current)
+            console.log("[v0] Marker created")
         } else {
             marker.current.setLngLat([lng, lat])
+            console.log("[v0] Marker updated")
         }
 
+        // Pan to current position if tracking
         if (isTracking) {
             map.current.easeTo({
                 center: [lng, lat],
@@ -110,9 +116,10 @@ export function Map() {
                 properties: {},
                 geometry: {
                     type: "LineString",
-                    coordinates,
+                    coordinates: coordinates,
                 },
             })
+            console.log("[v0] Route updated with", coordinates.length, "points")
         }
     }, [coordinates, mapLoaded])
 

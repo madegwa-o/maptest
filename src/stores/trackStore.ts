@@ -32,9 +32,21 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
             return
         }
 
+        set({
+            isTracking: true,
+            startTime: Date.now(),
+            coordinates: [],
+            currentPosition: null,
+            distance: 0,
+            duration: 0,
+            watchId: null,
+        })
+
         const watchId = navigator.geolocation.watchPosition(
             (position) => {
                 const coord: [number, number] = [position.coords.longitude, position.coords.latitude]
+
+                console.log("[v0] New GPS position received:", coord)
 
                 const state = get()
 
@@ -42,7 +54,9 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
                 let newDistance = state.distance
                 if (state.coordinates.length > 0) {
                     const lastCoord = state.coordinates[state.coordinates.length - 1]
-                    newDistance += calculateDistance(lastCoord[1], lastCoord[0], coord[1], coord[0])
+                    const distanceDelta = calculateDistance(lastCoord[1], lastCoord[0], coord[1], coord[0])
+                    newDistance += distanceDelta
+                    console.log("[v0] Distance delta:", distanceDelta, "Total:", newDistance)
                 }
 
                 set({
@@ -50,9 +64,11 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
                     currentPosition: coord,
                     distance: newDistance,
                 })
+
+                console.log("[v0] Total coordinates:", state.coordinates.length + 1)
             },
             (error) => {
-                console.error("Geolocation error:", error)
+                console.error("[v0] Geolocation error:", error)
                 alert("Unable to get your location. Please check your browser permissions.")
             },
             {
@@ -62,14 +78,8 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
             },
         )
 
-        set({
-            isTracking: true,
-            watchId,
-            startTime: Date.now(),
-            coordinates: [],
-            distance: 0,
-            duration: 0,
-        })
+        set({ watchId })
+        console.log("[v0] Started tracking with watchId:", watchId)
     },
 
     stopTracking: () => {
@@ -77,6 +87,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
 
         if (state.watchId !== null) {
             navigator.geolocation.clearWatch(state.watchId)
+            console.log("[v0] Stopped tracking, cleared watchId:", state.watchId)
         }
 
         const endTime = Date.now()
@@ -102,6 +113,8 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
         const history = JSON.parse(localStorage.getItem("routeHistory") || "[]")
         history.unshift(routeData)
         localStorage.setItem("routeHistory", JSON.stringify(history.slice(0, 10)))
+
+        console.log("[v0] Route saved:", routeData)
     },
 
     addCoordinate: (coord) => {

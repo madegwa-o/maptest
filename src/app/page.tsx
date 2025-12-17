@@ -1,71 +1,81 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Map } from "@/components/map"
-import { Metrics } from "@/components/metrics"
-import { useTrackingStore } from "@/stores/trackStore"
-import { Button } from "@/components/ui/button"
-import { Play, Square } from "lucide-react"
+import {useEffect, useState} from "react";
 
-export default function Home() {
-  const [isClient, setIsClient] = useState(false)
-  const { isTracking, startTracking, stopTracking, coordinates } = useTrackingStore()
+interface MyPosition {
+  accuracy?: number;
+  altitude?: number | null;
+  altitudeAccuracy?: number | null;
+  heading?: number | null;
+  speed?: number | null;
+  longitude: number;
+  latitude: number;
+}
+
+export default function MapPage() {
+  const [timestamp, setTimestamp] = useState<number>(0);
+  const [currentPosition, setCurrentPosition] = useState<MyPosition | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  const handleStartStop = () => {
-    if (isTracking) {
-      stopTracking()
-    } else {
-      startTracking()
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      return;
     }
-  }
 
-  if (!isClient) {
-    return (
-        <div className="flex h-screen items-center justify-center bg-background">
-          <div className="text-muted-foreground">Loading...</div>
-        </div>
-    )
-  }
+    const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          console.log("Position updated: ", position);
+          setCurrentPosition(position.coords);
+          setTimestamp(position.timestamp);
+          setError(null);
+        },
+        (err) => {
+          console.error("Geolocation error: ", err);
+          setError(err.message);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+    );
+
+    // Cleanup function to stop watching when component unmounts
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   return (
-      <div className="flex h-screen flex-col bg-background">
-        {/* Header */}
-        <header className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
-          <h1 className="text-2xl font-bold text-foreground">RouteTracker</h1>
-          <div className="flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${isTracking ? "bg-track-active animate-pulse" : "bg-muted"}`} />
-            <span className="text-sm text-muted-foreground">{isTracking ? "Tracking" : "Idle"}</span>
-          </div>
-        </header>
+      <div style={{ padding: '20px' }}>
+        <h1>Location Tracker</h1>
 
-        <div className="relative flex flex-1 flex-col lg:flex-row">
-          {/* Map Container */}
-          <div className="relative h-[60vh] w-full lg:h-full lg:flex-1">
-            <Map />
-
-            {/* Floating Control Button */}
-            <div className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2">
-              <Button
-                  onClick={handleStartStop}
-                  size="lg"
-                  className={`h-16 w-16 rounded-full shadow-xl transition-all hover:scale-105 ${
-                      isTracking ? "bg-destructive hover:bg-destructive/90" : "bg-track-active hover:bg-track-active/90"
-                  }`}
-              >
-                {isTracking ? <Square className="h-6 w-6 fill-current" /> : <Play className="h-6 w-6 fill-current" />}
-              </Button>
+        {error && (
+            <div style={{ color: 'red' }}>
+              <p>Error: {error}</p>
             </div>
-          </div>
+        )}
 
-          {/* Metrics Panel */}
-          <div className="h-[40vh] w-full border-t border-border bg-card lg:h-full lg:w-96 lg:border-l lg:border-t-0">
-            <Metrics />
-          </div>
-        </div>
+        {timestamp > 0 && (
+            <div>
+              <p><strong>Last Updated:</strong> {new Date(timestamp).toLocaleTimeString()}</p>
+            </div>
+        )}
+
+        {currentPosition ? (
+            <div>
+              <h2>Current Position:</h2>
+              <p><strong>Latitude:</strong> {currentPosition.latitude.toFixed(6)}</p>
+              <p><strong>Longitude:</strong> {currentPosition.longitude.toFixed(6)}</p>
+              <p><strong>Accuracy:</strong> {currentPosition.accuracy?.toFixed(2)} meters</p>
+              <p><strong>Altitude:</strong> {currentPosition.altitude?.toFixed(2) ?? 'N/A'} meters</p>
+              <p><strong>Speed:</strong> {currentPosition.speed?.toFixed(2) ?? 'N/A'} m/s</p>
+              <p><strong>Heading:</strong> {currentPosition.heading?.toFixed(2) ?? 'N/A'}°</p>
+            </div>
+        ) : (
+            <p>Waiting for location data...</p>
+        )}
       </div>
   )
 }
